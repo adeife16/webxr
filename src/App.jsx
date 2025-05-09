@@ -1,35 +1,50 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Canvas, useThree } from '@react-three/fiber'
+import { ARButton } from 'three/examples/jsm/webxr/ARButton'
+import { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
+import Marker from './components/Marker'
 
-function App() {
-  const [count, setCount] = useState(0)
+const Measurer = () => {
+  const { camera, gl, scene } = useThree()
+  const [points, setPoints] = useState([])
+  const raycaster = useRef(new THREE.Raycaster())
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+  useEffect(() => {
+    gl.xr.enabled = true
+    document.body.appendChild(ARButton.createButton(gl, { requiredFeatures: ['hit-test'] }))
+
+    const onClick = (event) => {
+      const viewerPose = gl.xr.getCamera(camera)
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(viewerPose.quaternion)
+      const origin = viewerPose.position
+
+      const point = new THREE.Vector3().copy(origin).add(direction.multiplyScalar(0.3)) // 30 cm forward
+      setPoints((prev) => [...prev, point])
+    }
+
+    window.addEventListener('click', onClick)
+    return () => window.removeEventListener('click', onClick)
+  }, [gl, camera])
+
+  useEffect(() => {
+    if (points.length === 2) {
+      const dist = points[0].distanceTo(points[1]) * 1000
+      console.log("Measured JSON:", JSON.stringify({ length_mm: +dist.toFixed(2) }, null, 2))
+    }
+  }, [points])
+
+  return <>
+    {points.map((point, i) => (
+      <Marker key={i} position={point} />
+    ))}
+  </>
 }
 
-export default App
+export default function App() {
+  return (
+    <Canvas onCreated={({ gl }) => { gl.xr.enabled = true }}>
+      <ambientLight />
+      <Measurer />
+    </Canvas>
+  )
+}
