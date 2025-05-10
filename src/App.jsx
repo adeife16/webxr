@@ -1,48 +1,56 @@
 import { Canvas, useThree } from '@react-three/fiber'
-import { ARButton } from 'three/examples/jsm/webxr/ARButton'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import Marker from './components/Marker'
+import { ARButton } from 'three/examples/jsm/webxr/ARButton'
+import Marker from './Marker'
 
 const Measurer = () => {
-  const { camera, gl, scene } = useThree()
+  const { gl, camera } = useThree()
   const [points, setPoints] = useState([])
-  const raycaster = useRef(new THREE.Raycaster())
 
   useEffect(() => {
     gl.xr.enabled = true
-    document.body.appendChild(ARButton.createButton(gl, { requiredFeatures: ['hit-test'] }))
 
-    const onClick = (event) => {
-      const viewerPose = gl.xr.getCamera(camera)
-      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(viewerPose.quaternion)
-      const origin = viewerPose.position
+    const button = ARButton.createButton(gl, {
+      requiredFeatures: ['hit-test'],
+    })
+    document.body.appendChild(button)
 
-      const point = new THREE.Vector3().copy(origin).add(direction.multiplyScalar(0.3)) // 30 cm forward
+    const handleSelect = () => {
+      const xrCam = gl.xr.getCamera(camera)
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(xrCam.quaternion)
+      const point = xrCam.position.clone().add(direction.multiplyScalar(0.3)) // 30 cm forward
       setPoints((prev) => [...prev, point])
     }
 
-    window.addEventListener('click', onClick)
-    return () => window.removeEventListener('click', onClick)
-  }, [gl, camera])
+    const session = gl.xr.getSession()
+    if (session) {
+      session.addEventListener('select', handleSelect)
+    } else {
+      gl.xr.addEventListener('sessionstart', () => {
+        gl.xr.getSession().addEventListener('select', handleSelect)
+      })
+    }
+  }, [])
 
   useEffect(() => {
     if (points.length === 2) {
       const dist = points[0].distanceTo(points[1]) * 1000
-      console.log("Measured JSON:", JSON.stringify({ length_mm: +dist.toFixed(2) }, null, 2))
+      console.log(JSON.stringify({ length_mm: +dist.toFixed(2) }, null, 2))
     }
   }, [points])
 
-  return <>
-    {points.map((point, i) => (
-      <Marker key={i} position={point} />
-    ))}
-  </>
+  return points.map((point, index) => <Marker key={index} position={point} />)
 }
 
 export default function App() {
   return (
-    <Canvas onCreated={({ gl }) => { gl.xr.enabled = true }}>
+    <Canvas
+      onCreated={({ gl }) => {
+        gl.xr.enabled = true
+      }}
+      camera={{ position: [0, 1.6, 0], fov: 70 }}
+    >
       <ambientLight />
       <Measurer />
     </Canvas>
