@@ -2,7 +2,7 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { ARButton } from 'three/examples/jsm/webxr/ARButton'
-import Marker from './Marker'
+import Marker from './components/Marker'
 
 const Measurer = () => {
   const { gl, camera } = useThree()
